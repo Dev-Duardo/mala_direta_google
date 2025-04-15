@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <style>
+      body { padding: 20px; }
+      .container { max-width: 600px; margin: auto; }
+      .ok-button-wrapper {
+        padding: 10px;
+        text-align: center;
+        border-top: 1px solid #ddd;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h5 class="center-align">Gerar Mala Direta</h5>
+
+      <!-- Dropdown: Sites -->
+      <div class="input-field">
+        <select id="siteSelect"></select>
+        <label>Selecione o site</label>
+      </div>
+
+      <!-- Dropdown: Lote -->
+      <div class="input-field">
+        <select id="loteSelect">
+          <option value="" disabled selected>Escolha o lote</option>
+          <option value="nomeFuncao1">Nome que irá aparecer no menu suspenso</option>
+  
+        </select>
+        <label>Escolha o tipo de lote</label>
+      </div>
+
+      <!-- Múltipla seleção: Documentos -->
+      <div class="input-field">
+        <select id="documentosSelect" multiple></select>
+        <label>Documentos para gerar</label>
+      </div>
+
+      <!-- Botão final -->
+      <div class="center-align">
+        <button class="btn waves-effect waves-light green" onclick="gerar()">Gerar</button>
+      </div>
+      <!-- Dentro do container, logo abaixo do botão GERAR -->
+      <div class="progress" id="progressBarContainer" style="display: none;">
+        <div class="determinate" id="progressBar" style="width: 0%"></div>
+      </div>
+
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        M.AutoInit();
+        google.script.run.withSuccessHandler(preencherSites).getListaSites();
+
+        // Hook para adicionar o botão OK dentro do dropdown
+        const observer = new MutationObserver(() => {
+          const dropdown = document.querySelector('.dropdown-content.select-dropdown.multiple-select-dropdown');
+          if (dropdown && !dropdown.querySelector('#okButtonInDropdown')) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'ok-button-wrapper';
+            wrapper.innerHTML = `<button id="okButtonInDropdown" class="btn-small blue">OK</button>`;
+            dropdown.appendChild(wrapper);
+
+            document.getElementById('okButtonInDropdown').addEventListener('click', () => {
+              const instance = M.FormSelect.getInstance(document.getElementById('documentosSelect'));
+              instance.dropdown.close();
+            });
+          }
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+      });
+
+      function preencherSites(lista) {
+        const select = document.getElementById('siteSelect');
+        lista.forEach(site => {
+          const option = document.createElement('option');
+          option.value = site;
+          option.textContent = site;
+          select.appendChild(option);
+        });
+        M.FormSelect.init(select);
+      }
+
+      document.getElementById('loteSelect').addEventListener('change', function () {
+        const lote = this.value;
+        google.script.run.withSuccessHandler(preencherDocumentos).getDocumentosDoLote(lote);
+      });
+
+      function preencherDocumentos(docs) {
+        const select = document.getElementById('documentosSelect');
+        select.innerHTML = '';
+        Object.entries(docs).forEach(([id, nome]) => {
+          const option = document.createElement('option');
+          option.value = id;
+          option.textContent = nome;
+          select.appendChild(option);
+        });
+        M.FormSelect.init(select);
+      }
+
+      function gerar() {
+      const site = document.getElementById('siteSelect').value;
+      const lote = document.getElementById('loteSelect').value;
+      const documentos = Array.from(document.getElementById('documentosSelect').selectedOptions).map(opt => opt.value);
+
+      if (!site || !lote || documentos.length === 0) {
+        M.toast({ html: 'Preencha todos os campos!', classes: 'red' });
+        return;
+      }
+
+      // Mostra a barra de progresso
+      const progressBar = document.getElementById('progressBar');
+      const progressContainer = document.getElementById('progressBarContainer');
+      progressContainer.style.display = 'block';
+      progressBar.style.width = '0%';
+
+      // Simula progresso enquanto o backend roda
+      let progress = 0;
+      const fakeProgress = setInterval(() => {
+        if (progress < 90) {
+          progress += Math.random() * 5;
+          progressBar.style.width = progress + '%';
+        }
+      }, 300);
+
+      google.script.run
+        .withSuccessHandler(() => {
+          clearInterval(fakeProgress);
+          progressBar.style.width = '100%';
+          M.toast({ html: 'Documentos gerados com sucesso!', classes: 'green' });
+          setTimeout(() => {
+            progressContainer.style.display = 'none';
+            progressBar.style.width = '0%';
+          }, 1000);
+        })
+        .withFailureHandler(err => {
+          clearInterval(fakeProgress);
+          progressContainer.style.display = 'none';
+          progressBar.style.width = '0%';
+          console.error(err);
+          M.toast({ html: 'Erro ao gerar: ' + err.message, classes: 'red' });
+        })
+        .gerarDocumentos(site, lote, documentos);
+
+      M.toast({ html: 'Processando...', classes: 'blue' });
+    }
+
+    </script>
+  </body>
+</html>
